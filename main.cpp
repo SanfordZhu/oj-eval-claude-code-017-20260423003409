@@ -16,7 +16,7 @@ struct StringNode {
     StringNode* next;
 };
 
-StringNode string_pool[HASH_SIZE * 10];
+StringNode string_pool[HASH_SIZE];
 int string_pool_ptr;
 
 StringNode* new_string_node(const char* key, int val) {
