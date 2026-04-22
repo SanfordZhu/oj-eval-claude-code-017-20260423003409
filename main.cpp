@@ -812,6 +812,9 @@ void clean() {
 }
 
 int main() {
+    string_pool = (StringNode*)malloc(sizeof(StringNode) * HASH_SIZE);
+    string_pool_ptr = 0;
+
     user_map.init();
     online_users.init();
     train_map.init();
