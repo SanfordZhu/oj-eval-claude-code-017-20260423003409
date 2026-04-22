@@ -1,6 +1,8 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
+#include <fcntl.h>
+#include <unistd.h>
 
 const int MAX_LEN = 256;
 const int HASH_SIZE = 100007;
@@ -373,6 +375,7 @@ int delete_train(const char* trainID) {
     if (trains[idx].released || trains[idx].deleted) return -1;
 
     trains[idx].deleted = true;
+    train_map.erase(trainID);
     return 0;
 }
 
@@ -517,9 +520,9 @@ void query_ticket(const char* from, const char* to, int date, const char* priori
         int_to_date(r.start_day, start_date);
         int_to_date(r.end_day, end_date);
 
-        p += sprintf(p, "%s %s %s %02d:%02d -> %s %s %02d:%02d %d\n",
-                    t.trainID, t.stations[r.from_idx], start_date, r.start_min / 60, r.start_min % 60,
-                    t.stations[r.to_idx], end_date, r.end_min / 60, r.end_min % 60,
+        p += sprintf(p, "%s %s %s %02d:%02d -> %s %s %02d:%02d %d %d\n",
+                    t.trainID, t.stations[r.from_idx], start_date, start_min / 60, start_min % 60,
+                    t.stations[r.to_idx], end_date, end_min / 60, end_min % 60,
                     r.price, r.seat);
     }
 }
@@ -556,9 +559,6 @@ void query_transfer(const char* from, const char* to, int date, const char* prio
                 int depart_day2 = arrive_day1;
                 int depart_min2 = arrive_min1;
 
-                int start_day2 = depart_day2;
-                int start_min2 = time_to_minutes(t2.startTime);
-
                 int leave_day1 = arrive_day1;
                 int leave_min1 = arrive_min1;
                 for (int m = from_idx1; m < j - 1; m++) {
@@ -569,13 +569,16 @@ void query_transfer(const char* from, const char* to, int date, const char* prio
                     }
                 }
 
-                int arrive_day2, arrive_min2;
-                add_minutes(start_day2, start_min2, t2.travelTimes[to_idx2], arrive_day2, arrive_min2);
+                int start_day2 = depart_day2;
+                int start_min2 = time_to_minutes(t2.startTime);
 
                 if (depart_day2 < start_day2 ||
                     (depart_day2 == start_day2 && depart_min2 < start_min2)) {
                     continue;
                 }
+
+                int arrive_day2, arrive_min2;
+                add_minutes(start_day2, start_min2, t2.travelTimes[to_idx2], arrive_day2, arrive_min2);
 
                 int duration1 = (arrive_day1 - date) * 24 * 60 + (arrive_min1 - time_to_minutes(t1.startTime));
                 int duration2 = (arrive_day2 - start_day2) * 24 * 60 + (arrive_min2 - start_min2);
@@ -628,6 +631,7 @@ void query_transfer(const char* from, const char* to, int date, const char* prio
                     add_minutes(date, best_transfer1.start_min, t1.travelTimes[from_idx1], best_transfer1.end_day, best_transfer1.end_min);
                     best_transfer2.train_idx = k;
                     best_transfer2.from_idx = to_idx2;
+                    best_transfer2.to_idx = to_idx2;
                     best_transfer2.start_day = start_day2;
                     best_transfer2.start_min = start_min2;
                     add_minutes(start_day2, best_transfer2.start_min, t2.travelTimes[to_idx2], best_transfer2.end_day, best_transfer2.end_min);
@@ -668,11 +672,11 @@ void query_transfer(const char* from, const char* to, int date, const char* prio
         }
     }
 
-    p += sprintf(p, "%s %s %s %02d:%02d -> %s %s %02d:%02d %d\n",
+    p += sprintf(p, "%s %s %s %02d:%02d -> %s %s %02d:%02d %d %d\n",
                 t1.trainID, t1.stations[best_transfer1.from_idx], start_date1, best_transfer1.start_min / 60, best_transfer1.start_min % 60,
                 t1.stations[best_transfer1.to_idx], end_date1, best_transfer1.end_min / 60, best_transfer1.end_min % 60,
                 t1.prices[best_transfer1.to_idx] - t1.prices[best_transfer1.from_idx], min_seat1);
-    p += sprintf(p, "%s %s %s %02d:%02d -> %s %s %02d:%02d %d\n",
+    p += sprintf(p, "%s %s %s %02d:%02d -> %s %s %02d:%02d %d %d\n",
                 t2.trainID, t2.stations[best_transfer2.from_idx], start_date2, best_transfer2.start_min / 60, best_transfer2.start_min % 60,
                 t2.stations[best_transfer2.to_idx], end_date2, best_transfer2.end_min / 60, best_transfer2.end_min % 60,
                 t2.prices[best_transfer2.to_idx] - t2.prices[best_transfer2.from_idx], min_seat2);
@@ -767,7 +771,7 @@ int query_order(const char* username, char* output) {
         int_to_date(o.date, start_date);
         int_to_date(o.end_day, end_date);
 
-        p += sprintf(p, "[%s] %s %s %02d:%02d -> %s %s %02d:%02d %d %d\n",
+        p += sprintf(p, "[%s] %s %s %02d:%02d -> %s %s %02d:%02d %d %d %d\n",
                     status_str, t.trainID, t.stations[o.from_idx], start_date, o.start_min / 60, o.start_min % 60,
                     t.stations[o.to_idx], end_date, o.end_min / 60, o.end_min % 60,
                     o.price, o.num);
@@ -892,7 +896,7 @@ int main() {
             printf("%s\n", modify_profile(c, u, pw, nm, mail, privilege, output));
         } else if (str_equal(command, "add_train")) {
             char i[30], n[10], m[10], s[500], p[500], x[10], t[500], o[500], d[20], y[2];
-            sscanf(cmd_ptr, "-i %s -n %d -m %s -p %s -x %s -t %s -o %s -d %s -y %s",
+            sscanf(cmd_ptr, "-i %s -n %d -m %d -s %s -p %s -x %s -t %s -o %s -d %s -y %s",
                    i, n, m, s, p, x, t, o, d, y);
             printf("%d\n", add_train(i, atoi(n), atoi(m), s, p, x, t, o, d, y[0]));
         } else if (str_equal(command, "release_train")) {
@@ -956,3 +960,5 @@ int main() {
 
     return 0;
 }
+EOF
+g++ -o code /workspace/problem_017/main_new.cpp -O2 -std=c++17 -mcmodel=medium && cp /workspace/problem_017/code /workspace/problem_017/code
