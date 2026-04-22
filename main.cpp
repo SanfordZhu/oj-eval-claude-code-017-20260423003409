@@ -5,9 +5,9 @@
 
 const int MAX_LEN = 256;
 const int HASH_SIZE = 100007;
-const int MAX_USERS = 1000;
-const int MAX_TRAINS = 1000;
-const int MAX_ORDERS = 10000;
+const int MAX_USERS = 500;
+const int MAX_TRAINS = 500;
+const int MAX_ORDERS = 5000;
 const int MAX_STATIONS = 100;
 const int MAX_DAYS = 100;
 
